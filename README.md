@@ -28,13 +28,13 @@ The fleet scheduler SHALL receive event-driven drone state change notifications.
 
 ## Non-Functional
 
-### NFR-001	
+### NFR-001
 The fleet scheduler SHALL manage charging requests from multiple drones sharing a single charging pad.
 
-### NFR-002	
+### NFR-002
 The fleet scheduler SHALL consider the battery State of Charge (SoC) when allocating charging windows.
 
-### NFR-003	
+### NFR-003
 The fleet scheduler SHALL consider the battery State of Health (SoH) when allocating charging windows.
 
 ### NFR-004
@@ -46,7 +46,7 @@ The fleet scheduler SHALL consider each drone’s estimated time to return when 
 ### NFR-006
 The fleet scheduler SHALL consider each drone’s estimated latest possible time to begin return when allocating charging windows.
 
-### NFR-007	
+### NFR-007
 The fleet scheduler SHALL consider the current state of each drone and the charging pad when allocating charging windows.
 
 # Design
@@ -86,40 +86,129 @@ The central challenge for our system is that the drone with the lowest SoC is no
 
 The scheduler must therefore consider both energy safety and resource availability.
 
+### Algorithm Basis
+
 | Algorithm | Notes |
 | --------- | ----- |
-| First Come First Serve (FCFS) | etc |
-| Earliest Deadline First (EDF) | etc |
-| Least Slack Time (LST) | etc |
-| Fixed-Priority Preemptive | etc |
+| First Come First Serve (FCFS) | N/A |
+| Fixed-Priority Preemptive | N/A |
+| Earliest Deadline First (EDF) | N/A |
+| Least Laxity First (LLF) | N/A |
 | Less Laxity and Longer remaining Processing time (LLLP) | Dynamic Scheduling for Charging Electric Vehicles: A Priority Rule Y. Xu, F. Pan, and L. Tong, 2016. IEEE Transactions on Automatic Control, 61(12), 4094–4099. |
 
-Evaluate: Implementation complexity, charging pad utilization, adaptability to new info, drone energy efficiency (Can drones receive partial charges when sufficient for the next mission?), drone stranded rate, fairness, 
+#### FCFS
 
-### FCFS
- 
-Serves charging requests in the order they arrive. Advantages include simple implementation and low scheduling overhead. However it does not account for SoC, SoH, energy consumption, or deadlines. A low-urgency drone could occupy the pad while another drone approaches its safe return deadline.
+Also referred to as FIFO (First Come First Serve), this algorithm would serve charging requests in the order they arrive. Advantages include extremely simple implementation and low scheduling overhead. However it does not account for SoC, SoH, energy consumption, or deadlines. A low-urgency drone could occupy the pad while another drone approaches its safe return deadline.
 
-### EDF
+#### Fixed-Priority Preemptive
 
-Priority given to the drone with the earliest approaching deadline. Its advantage is that it dynamically responds to changing deadlines, unfortunate an earlier deadline does not necessarily mean a drone has the least energy reserve. It also does not inherently account for charging duration, landing time, or whether the pad will be available in time.
+This is where priority levels are assigned in advance and a higher-priority request can preempt lower-priority work under the policy's rules. It is a predictable priority structure, supports explicit emergency and mission-critical priorities and is useful for distinguishing emergency returns from routine charging requests. It's disadvantages are that static priorities may not reflect changing battery conditions, lower-priority drones can starve, and preempting a charging session is not necessarily physically practical or desirable.
 
-### LSTF
+#### EDF
 
-Algorithm prioritizes the drone with the least remaining scheduling flexibility, also called laxity.
+Here, priority will be given to the drone with the earliest approaching deadline. This algorithm is known to be optimal for single resource scheduling as it dynamically responds to changing deadlines, unfortunately in this case, an earlier deadline does not necessarily mean a drone has the least energy reserve.
 
-A basic definition is:
-Slack_i = D_i - t - C_i
+#### LLF
+
+Another algorithm that is considered optimal for single resource scheduling. Here, the drone with the least remaining scheduling flexibility, also called laxity, has priority.
+
+Laxity is:
+L_i = D_i - t - C_i
 
 Where D_i is the relevant deadline, t is the current time and C_i is the estimated time needed to complete the relevant task.
 
 For this system, the task might include returning to the pad, landing, or waiting for access to the pad. The calculation must match the particular deadline being protected. The advantages here are that it accounts for both deadlines and remaining time requirements, can respond dynamically to changing return times and resource availability, and it also helps identify drones with little time left before missing a deadline.
-On the either side however, it requires reliable estimates of task duration and pad availability, priorities may change frequently as estimates and telemetry update and a low-slack drone may still be infeasible to serve safely; the scheduler needs a separate feasibility and emergency-response check.
+On the other side however, it requires reliable estimates of task duration and pad availability, priorities may change frequently as estimates and telemetry update and a low-slack drone may still be infeasible to serve safely; the scheduler would need a separate feasibility and emergency-response check.
 
-### Fixed-Priority Preemptive
+#### LLLP
 
-This is where priority levels are assigned in advance and a higher-priority request can preempt lower-priority work under the policy's rules. It is a predictable priority structure, supports explicit emergency and mission-critical priorities and is useful for distinguishing emergency returns from routine charging requests. It's disadvantages are that static priorities may not reflect changing battery conditions, lower-priority drones can starve, and preempting a charging session is not necessarily physically practical or desirable.
+This algorithm, proposed by Xu et al., is based on the fact that when the completion of all tasks is not feasible, it has been demonstrated that EDF and LLF may perform poorly. Their algorithm is a charging-related priority policy that combines laxity with remaining processing time. Pros include the fact its design is directly relevant to resource scheduling with deadlines and differing charging requirements, and it encourages consideration of both urgency and the time needed to serve a request. Unfortunately, its theoretical guarantees depend on the model and objective being studied, and it may require additional calculations and assumptions compared with EDF or LLF.
 
-### LLLP
+### Weighted Evaluation
 
-This algorithm is a charging-related priority policy that combines slack/laxity with remaining processing time. Pros include the fact its design is directly relevant to resource scheduling with deadlines and differing charging requirements, and it encourages consideration of both urgency and the time needed to serve a request. Unfortunately, its theoretical guarantees depend on the model and objective being studied, and it may require additional calculations and assumptions compared with EDF or LSTF.
+| Parameter | Weight | FCFS | Fixed-Prio | EDF | LLF | LLLP |
+| --------- | ----- | ----- | ----- | ----- | ----- | ----- |
+| 1. Energy Safety | 30% | 3 | 7 | 6 | 8 | 8 |
+| 2. Adaptability | 20% | 2 | 4 | 8 | 9 | 8 |
+| 3. Charging Efficiency | 15% | 4 | 5 | 7 | 7 | 8 |
+| 4. Charging Pad Utilization | 15% | 6 | 6 | 8 | 7 | 8 |
+| 5. Implementation Complexity | 10% | 10 | 7 | 8 | 6 | 4 |
+| 6. Fairness | 10% | 8	| 4 | 6 | 5 | 5 |
+| FInal Score | | 4.55 | 5.65 | 7.15 | 7.35 | 7.20 |
+
+Elaboration on Parameters:
+1. Ability to incorporate battery state, energy consumption, and safe return requirements to minimize stranded drones.
+2. Ability to recalculate priorities when telemetry, drone states, or pad availability change.
+3. Ability to allocate charging time effectively, including partial charging when sufficient for the next mission.
+4. 	Ability to minimize idle time and coordinate access to the single charging pad.
+5. Effort required to adapt the algorithm to the system's requirements and integrate it with the Fleet Scheduler.
+6. Ability to prevent drones from being indefinitely delayed while accommodating urgent charging needs.
+
+## Interface Design
+
+```mermaid
+flowchart LR
+    subgraph SOURCES["Information Sources"]
+        D["Drone Fleet"]
+        PAD["Charging Pad"]
+        OP["Human Operator"]
+    end
+
+    subgraph CS["Control Station"]
+        RX["Telemetry and Command Intake"]
+        TX["Schedule and Command Distribution"]
+    end
+
+    subgraph FS["Fleet Scheduler"]
+        direction TB
+
+        subgraph INPUTS["Inputs"]
+            SOC["State of Charge (SoC)"]
+            SOH["State of Health (SoH)"]
+            ECR["Energy Consumption Rate"]
+            TTR["Time to Return"]
+            LRT["Latest Safe Return-Start Time"]
+            STATE["Current Drone State"]
+            PADSTATE["Charging Pad State"]
+            CMD["Operator Commands"]
+        end
+
+        subgraph LOGIC["Scheduling Logic"]
+            LAX["Calculate Laxity"]
+            PRIORITY["Determine Feasibility and Drone Priorities"]
+            SCHEDULE["Calculate Charging Schedule"]
+        end
+
+        SOC --> LAX
+        SOH --> LAX
+        ECR --> LAX
+        TTR --> LAX
+        LRT --> LAX
+        STATE --> PRIORITY
+        PADSTATE --> SCHEDULE
+        CMD --> PRIORITY
+
+        LAX --> PRIORITY
+        PRIORITY --> SCHEDULE
+    end
+
+    D -->|Drone telemetry| RX
+    PAD -->|Pad status| RX
+    OP -->|Scheduling overrides| RX
+
+    RX -->|Telemetry, pad status, commands| INPUTS
+
+    SCHEDULE -->|Output Schedule| TX
+    TX -->|Schedule and charging allocation| OP
+    TX -->|Forwarded commands| D
+```
+
+Laxity is calculated by:
+
+L_i = D_i - t - C_i
+
+Letting D_i be the deadline by which drone i must reach the charging pad and C_i be the estimated time drone i needs to return to the charging pad...
+
+T_latest return start,i = D_i - C_i
+
+L_i = T_latest return start,i - t_current
