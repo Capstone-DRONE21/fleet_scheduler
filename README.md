@@ -11,6 +11,7 @@
 * [Design](#design)
   * [Inputs and Outputs](#inputs-and-outputs)
   * [Alternatives Analysis](#alternatives-analysis)
+  * [Interface Design](#interface-design)
 
 # Purpose
 
