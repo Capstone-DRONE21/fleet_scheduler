@@ -69,11 +69,11 @@ The inputs are as follows:
 | ----- | ------- |
 | State of Charge (SoC) | Estimates the battery's remaining charge. |
 | State of Health (SoH) | Accounts for battery degradation and reduced usable capacity. |
-| Energy consumption rate | Estimates energy consumption during flight, hovering, and other operating states. |
+| Energy consumption rate | Estimates energy consumption during flight, hovering, and other operating status's. |
 | Time to return | Estimates how long the drone needs to reach the charging pad. |
 | Latest possible return-start time | Defines the latest safe time to begin returning. |
-| Current drone state | Identifies whether the drone is flying, returning, landing, charging, or ready to depart. |
-| Charging pad state | Indicates whether the pad is available, occupied, reserved, or unavailable. |
+| Current drone status | Identifies whether the drone is flying, returning, landing, charging, or ready to depart. |
+| Charging pad status | Indicates whether the pad is available, occupied, reserved, or unavailable. |
 | Operator Commands | Override the scheduling logic to prioritize the command form the human operator. |
 
 Visually, the high-level overview is as shown:
@@ -83,7 +83,7 @@ flowchart LR
     CS[Control Station]
     FS[Fleet Scheduler]
 
-    CS -->|Drone telemetry, charging pad state, and Operator Commands| FS
+    CS -->|Drone telemetry, charging pad status, and Operator Commands| FS
     FS -->|Charging schedule| CS
     CS -->|Schedule, charging allocation, estimated start times| OUT[Dashboard / Operator]
     CS -->|Forwarded drone commands| D[Drone Fleet]
@@ -149,7 +149,7 @@ This algorithm, proposed by Xu et al., is based on the fact that when the comple
 
 Elaboration on Parameters:
 1. Ability to incorporate battery state, energy consumption, and safe return requirements to minimize stranded drones.
-2. Ability to recalculate priorities when telemetry, drone states, or pad availability change.
+2. Ability to recalculate priorities when telemetry, drone status, or pad availability change.
 3. Ability to allocate charging time effectively, including partial charging when sufficient for the next mission.
 4. Ability to minimize idle time and coordinate access to the single charging pad.
 5. Effort required to adapt the algorithm to the system's requirements and integrate it with the Fleet Scheduler.
@@ -179,8 +179,8 @@ flowchart LR
             ECR["Energy Consumption Rate"]
             TTR["Time to Return"]
             LRT["Latest Safe Return-Start Time"]
-            STATE["Current Drone State"]
-            PADSTATE["Charging Pad State"]
+            STATE["Current Drone Status"]
+            PADSTATE["Charging Pad Status"]
             CMD["Operator Commands"]
         end
 
@@ -232,6 +232,6 @@ Revised usage of inputs:
 | Latest possible return-start time | Used to calculate laxity. |
 | Current time | Used to calculate laxity. |
 | Time to return | Estimates arrival of drone and scheduling feasibility. |
-| Current drone state | Determine whether the drone is flying, returning, landing, charging, or ready to depart. |
-| Charging pad state | Determine pad availability. |
+| Current drone status | Determine whether the drone is flying, returning, landing, charging, or ready to depart. |
+| Charging pad status | Determine pad availability. |
 | Operator Commands | Scheduling overrides. |
